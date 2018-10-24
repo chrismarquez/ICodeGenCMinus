@@ -1,18 +1,16 @@
 import me.sargunvohra.lib.cakeparse.api.lexer
 import me.sargunvohra.lib.cakeparse.api.token
 import me.sargunvohra.lib.cakeparse.lexer.Lexer
-import me.sargunvohra.lib.cakeparse.parser.ParsableToken
 
 object LexicalAnalysis {
 
     val space = token("space", "[ \\t\\n\\r]", true)
     val id = token("id", "([A-Za-z]([A-Za-z0-9])*)|(_([_A-Za-z0-9])*[A-za-z]([A-Za-z0-9])*)")
     val number = token("number", "[0-9]+")
-
     val leftBrace = token("leftBrace", "\\{")
     val rightBrace = token("rightBrace", "\\}")
-    val leftBraket = token("leftBraket", "\\[")
-    val rightBraket = token("rightBraket", "\\]")
+    val leftBracket = token("leftBracket", "\\[")
+    val rightBracket = token("rightBracket", "\\]")
     val leftParens = token("leftParens", "\\(")
     val rightParens = token("rightParens", "\\)")
     val comma = token("comma", "\\,")
@@ -41,11 +39,11 @@ object LexicalAnalysis {
 
     val Lex: Lexer
         get() = setOf(
+            whileR, ifR, elseR, returnR, intR, voidR,
             space, id, number,
-            leftBrace, rightBrace, leftBraket, rightBraket, leftParens, rightParens, comma,
+            leftBrace, rightBrace, leftBracket, rightBracket, leftParens, rightParens, comma, semicolon,
             plus, minus, times, over,
             equals, lessThan, moreThan, lessThanEquals, moreThanEquals, notEquals,
-            assign,
-            whileR, ifR, elseR, returnR, intR, voidR
+            assign
         ).lexer()
 }

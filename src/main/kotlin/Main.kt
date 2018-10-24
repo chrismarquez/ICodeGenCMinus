@@ -4,29 +4,22 @@ import LexicalAnalysis.minus
 import LexicalAnalysis.number
 import LexicalAnalysis.plus
 import me.sargunvohra.lib.cakeparse.api.*
-import me.sargunvohra.lib.cakeparse.lexer.Token
 import me.sargunvohra.lib.cakeparse.lexer.TokenInstance
-import kotlin.math.min
+import java.io.File
 
 
 fun main() {
 
-    val gen = "t1"
-    val code = mutableListOf<String>()
-
-    val sum = number and (plus then number) map {
-        code.add("$gen = ${it.first.raw} +  ${it.second.raw}")
-        TokenInstance(id, gen, 0, 0, 0)
-    }
-
-    val minus = number and (minus then number)
-
-    val addOp = sum or minus
+    val file = File("cMinusCode.c").readText()
 
     try {
-        val result = LexicalAnalysis.Lex.lex("2 - 3").parseToEnd(addOp)
-        println(result)
+        val tokens = LexicalAnalysis.Lex.lex(file)
+        //val list = tokens.toList()
+        val result = tokens.parseToEnd(Parser.getParser())
+        val state = result.value as ParseState
+        println(state.code)
     } catch (e: Exception) {
         System.err.println(e)
     }
+
 }
