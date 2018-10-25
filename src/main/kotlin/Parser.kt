@@ -22,7 +22,6 @@ import LexicalAnalysis.rightBrace
 import LexicalAnalysis.rightBracket
 import LexicalAnalysis.rightParens
 import LexicalAnalysis.semicolon
-import LexicalAnalysis.space
 import LexicalAnalysis.times
 import LexicalAnalysis.voidR
 import LexicalAnalysis.whileR
@@ -39,23 +38,23 @@ object Parser {
     val callRef:BaseParser<ParseState> = ref{ call }
     val expressionRef: BaseParser<ParseState> = ref { expression }
     val mulopRef: BaseParser<TokenInstance> = ref {mulop}
-    val factorRef: BaseParser<Any> = ref {factor}
-    val termRef: BaseParser<Any> = ref { term }
-    val additiveExpressionRef: BaseParser<Any> = ref { additiveExpression }
+    val factorRef: BaseParser<ParseState> = ref {factor}
+    val termRef: BaseParser<ParseState> = ref { term }
+    val additiveExpressionRef: BaseParser<ParseState> = ref { additiveExpression }
     val statementListRef: BaseParser<Any> = ref { statementList }
     val localDeclarationsRef: BaseParser<ParseState> = ref { localDeclarations }
     val paramListRef: BaseParser<TokenInstance> = ref { paramList }
     val declarationListRef: BaseParser<ParseState> = ref { declarationList }
     val addOpRef: BaseParser<TokenInstance> = ref { addop }
     val relopRef: BaseParser<TokenInstance> = ref { relop }
-    val variableRef: BaseParser<TokenInstance> = ref{ variable }
+    val variableRef: BaseParser<ParseState> = ref{ variable }
     val simpleExpressionRef: BaseParser<ParseState> = ref { simpleExpression }
-    val expressionStmtRef: BaseParser<TokenInstance> = ref { expressionStatement }
+    val expressionStmtRef: BaseParser<ParseState> = ref { expressionStatement }
     val compoundStmtRef: BaseParser<ParseState> = ref { compoundStatement }
-    val statementRef: BaseParser<Any> = ref { statement}
-    val selectionStmtRef: BaseParser<Any> = ref { selectionStatement }
-    val iterationStmtRef: BaseParser<Any> = ref { iterationStatement }
-    val returnStmtRef: BaseParser<TokenInstance> = ref { returnStatement }
+    val statementRef: BaseParser<ParseState> = ref { statement }
+    val selectionStmtRef: BaseParser<ParseState> = ref { selectionStatement }
+    val iterationStmtRef: BaseParser<ParseState> = ref { iterationStatement }
+    val returnStmtRef: BaseParser<ParseState> = ref { returnStatement }
     val paramsRef: BaseParser<TokenInstance> = ref { params }
     val paramRef: BaseParser<TokenInstance> = ref { param }
     val typeSpecifierRef: BaseParser<TokenInstance> = ref { typeSpecifier }
@@ -73,12 +72,12 @@ object Parser {
     val declaration = funcDeclarationRef or variableDeclarationRef
     val variableDeclaration = ((typeSpecifierRef then id before semicolon) or
                               (typeSpecifierRef then id before leftBracket before number before rightBracket before semicolon)) map {
-        ParseState("", it, 0, 0)
+        ParseState("", it.raw, 0, 0)
     }
 
     val typeSpecifier = intR or voidR
     val funcDeclaration = typeSpecifier then id and (leftParens then paramsRef before rightParens) map {
-        ParseState("entry ${it.first.raw}:", it.first, 0, 0)
+        ParseState("entry ${it.first.raw}:", it.first.raw, 0, 0)
     } and compoundStmtRef map(::join)
     val params = voidR or paramListRef
     val paramList = paramRef or (paramRef before comma before paramListRef)
@@ -87,41 +86,36 @@ object Parser {
         if (it is ParseState) {
             it
         } else {
-            ParseState("", TokenInstance(space, "", 0, 0, 0), 0, 0)
+            ParseState("", "", 0, 0)
         }
     }
     val innerBracket = (localDeclarationsRef then statementListRef) or localDeclarationsRef or statementListRef
     val localDeclarations = (variableDeclaration then localDeclarationsRef) or variableDeclaration
     val statementList = (statementRef then statementListRef) or statementRef
     val statement = returnStmtRef or selectionStmtRef or iterationStmtRef or expressionStmtRef or compoundStmtRef
-    val expressionStatement = semicolon or (expressionRef then semicolon)
-    val ifStatement = ifR then leftParens then expressionRef then rightParens then statementRef
-    val ifElseStatement = ifR then leftParens then expressionRef map {
-        println("${ParseRules.next()} = ${it.code}")
-        it
-    } then rightParens then statementRef then elseR then statementRef
+    val expressionStatement = semicolon map { ParseState.Empty } or (expressionRef before semicolon)
+    val ifStatement = ifR then leftParens then expressionRef before rightParens map(ParseRules::ifStart) and statementRef map(ParseRules::ifStatement)
+    val ifElseStatement = ifR then leftParens then expressionRef before rightParens map(ParseRules::ifStart) and
+        statementRef map (ParseRules::ifStatement) before elseR and statementRef map(ParseRules::elseStatement)
     val selectionStatement =  ifElseStatement or ifStatement
-    val iterationStatement = whileR then leftParens then expressionRef then rightParens then statementRef
-    val returnStatement = (returnR then semicolon) or (returnR then expressionRef then semicolon)
-    val expression = (variableRef and (assign then expressionRef) map {
-        ParseState("${it.first.raw} = ${it.second.token.raw}", it.first, 0 ,0)
-    }) or simpleExpressionRef
-    val variable = (id then leftBracket then expressionRef then rightBracket) or id
+    val iterationStatement = whileR then leftParens then expressionRef before rightParens and statementRef map(ParseRules::whileStatement)
+    val returnStatement = (returnR then semicolon map(ParseRules::emptyReturn)) or
+            (returnR then expressionRef before semicolon map(ParseRules::varReturn))
 
-    val simpleExpression = (additiveExpressionRef and relopRef map {
-        ParseState("${it.first} ${it.second.raw}", it.second, 0, 0)
-    } and additiveExpressionRef map {
-        ParseState("${it.first} ${it.second}", it.first.token, 0, 0)
-    }) or additiveExpressionRef map {
-        ParseState(it.toString(), TokenInstance(space, "", 0, 0, 0), 0, 0)
-    }
+    val expression = (variableRef and (assign then expressionRef) map(ParseRules::varAssign)) or simpleExpressionRef
+    val variable = (id before leftBracket and expressionRef before rightBracket map(ParseRules::bracketVar)) or (id map(ParseRules::fromToken))
+
+    val simpleExpression = (additiveExpressionRef and relopRef map(ParseRules::singleExprLeft) and
+            additiveExpressionRef map(ParseRules::singleExprRight)) or additiveExpressionRef
 
     val relop = lessThanEquals or lessThan or moreThan or moreThanEquals or equals or notEquals
-    val additiveExpression = (termRef and addOpRef and additiveExpressionRef) or termRef
+    val additiveExpression = (termRef and addOpRef map(ParseRules::singleExprLeft) and
+            additiveExpressionRef map(ParseRules::singleExprRight)) or termRef
     val addop = plus or minus
-    val term = (factorRef then mulopRef then termRef) or factorRef
+    val term = (factorRef and mulopRef map(ParseRules::singleExprLeft)
+            and termRef map(ParseRules::singleExprRight)) or factorRef
     val mulop = times or over
-    val factor = callRef or variable or number or (leftParens then expression then rightParens)
+    val factor = callRef or variable or (number map(ParseRules::fromToken)) or (leftParens then expression before rightParens)
 
 
     val emptyCall = id then leftParens then rightParens map(ParseRules::callFunction)
