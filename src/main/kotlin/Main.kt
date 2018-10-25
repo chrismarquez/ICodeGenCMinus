@@ -16,7 +16,7 @@ fun main() {
         val tokens = LexicalAnalysis.Lex.lex(file)
         //val list = tokens.toList()
         val result = tokens.parseToEnd(Parser.getParser())
-        val state = result.value as ParseState
+        val state = result.value
         println(state.code)
     } catch (e: Exception) {
         System.err.println(e)

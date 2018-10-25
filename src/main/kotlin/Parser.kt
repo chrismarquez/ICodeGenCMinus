@@ -41,7 +41,7 @@ object Parser {
     val factorRef: BaseParser<ParseState> = ref {factor}
     val termRef: BaseParser<ParseState> = ref { term }
     val additiveExpressionRef: BaseParser<ParseState> = ref { additiveExpression }
-    val statementListRef: BaseParser<Any> = ref { statementList }
+    val statementListRef: BaseParser<ParseState> = ref { statementList }
     val localDeclarationsRef: BaseParser<ParseState> = ref { localDeclarations }
     val paramListRef: BaseParser<TokenInstance> = ref { paramList }
     val declarationListRef: BaseParser<ParseState> = ref { declarationList }
@@ -70,10 +70,10 @@ object Parser {
     val program = declarationListRef
     val declarationList = (declarationRef and declarationListRef map(::join)) or declarationRef
     val declaration = funcDeclarationRef or variableDeclarationRef
-    val variableDeclaration = ((typeSpecifierRef then id before semicolon) or
-                              (typeSpecifierRef then id before leftBracket before number before rightBracket before semicolon)) map {
-        ParseState("", it.raw, 0, 0)
-    }
+    val variableDeclaration = (typeSpecifierRef then id before semicolon map(ParseRules::fromToken)) or
+                              (((typeSpecifierRef then id before leftBracket) and number) before rightBracket before semicolon map {
+        ParseState("", "${it.first.raw}[${it.second.raw}]", 0, 0)
+    })
 
     val typeSpecifier = intR or voidR
     val funcDeclaration = typeSpecifier then id and (leftParens then paramsRef before rightParens) map {
@@ -91,7 +91,7 @@ object Parser {
     }
     val innerBracket = (localDeclarationsRef then statementListRef) or localDeclarationsRef or statementListRef
     val localDeclarations = (variableDeclaration then localDeclarationsRef) or variableDeclaration
-    val statementList = (statementRef then statementListRef) or statementRef
+    val statementList = (statementRef and statementListRef map(ParseRules::parseStatements)) or statementRef
     val statement = returnStmtRef or selectionStmtRef or iterationStmtRef or expressionStmtRef or compoundStmtRef
     val expressionStatement = semicolon map { ParseState.Empty } or (expressionRef before semicolon)
     val ifStatement = ifR then leftParens then expressionRef before rightParens map(ParseRules::ifStart) and statementRef map(ParseRules::ifStatement)
@@ -118,13 +118,13 @@ object Parser {
     val factor = callRef or variable or (number map(ParseRules::fromToken)) or (leftParens then expression before rightParens)
 
 
-    val emptyCall = id then leftParens then rightParens map(ParseRules::callFunction)
+    val emptyCall = id before leftParens before rightParens map(ParseRules::callFunction)
     val paramCall = id and (leftParens then argListRef before rightParens) map(ParseRules::callFunction)
     val call = emptyCall or paramCall
 
     val argList = (expression before comma and argListRef map(ParseRules::parseArguments)) or expression
 
-    fun getParser(): BaseParser<Any> {
+    fun getParser(): BaseParser<ParseState> {
         return program
     }
 
