@@ -80,8 +80,8 @@ object Parser {
         ParseState("entry ${it.first.raw}:", it.first.raw, 0, 0)
     } and compoundStmtRef map(::join)
     val params = voidR or paramListRef
-    val paramList = paramRef or (paramRef before comma before paramListRef)
-    val param = (typeSpecifier then id) or (typeSpecifier then id before leftBracket before rightBracket)
+    val paramList = (paramRef before comma before paramListRef) or paramRef
+    val param = (typeSpecifier then id before leftBracket before rightBracket) or (typeSpecifier then id)
     val compoundStatement = ((leftBrace then rightBrace) or (leftBrace then innerBracketRef before rightBrace)) map {
         if (it is ParseState) {
             it
@@ -127,8 +127,5 @@ object Parser {
     fun getParser(): BaseParser<ParseState> {
         return program
     }
-
-
-
 
 }
